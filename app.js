@@ -64,6 +64,9 @@ Passport.use(new localStrategy(function(userName, password, done) {
 
 }));
 
+function isLoggedin(req, res, next) {
+
+}
 
 
 //routes
