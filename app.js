@@ -65,18 +65,57 @@ Passport.use(new localStrategy(function(userName, password, done) {
 }));
 
 function isLoggedin(req, res, next) {
+    if (req.isAuthenticated) {
+        return next()
+
+    } else {
+        res.redirect('/login')
+
+    }
 
 }
 
 
 //routes
-app.get('/', (req, res) => {
+app.get('/', isLoggedin, (req, res) => {
     res.render("index", { title: "Home" })
 
 });
 
 app.get('/login', (req, res) => {
     res.render("Login", { title: "Login" })
+})
+
+app.get('/setup', async(req, res) => {
+    const exists = await user.exists({ username: "admin" });
+
+    if (exists) {
+        res.redirect('/login');
+        return;
+    };
+
+    bcrypt.genSalt(10, function(err, salt) {
+        if (err) {
+            return next(err);
+
+        }
+
+        bcrypt.hash("myPassword", salt, function(err, hash) {
+            if (err) {
+                return next(err);
+
+            }
+
+            const newAdmin = new User({
+                username: 'admin',
+                password: hash
+            });
+
+            newAdmin.save();
+            res.redirect('/login')
+        });
+    })
+
 })
 
 app.listen(4000, () => {
