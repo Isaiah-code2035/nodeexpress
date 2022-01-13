@@ -14,6 +14,19 @@ mongoose.connect("mongodb://localhost:27017/DB_USER", {
     useNewUrlParser: true,
     useUnifiedTopology: true
 })
+const UserSchema = new mongoose.Schema({
+    username: {
+        type: String,
+        required: true
+    },
+    password: {
+        type: String,
+        required: true
+    }
+});
+
+const User = mongoose.model('user', UserSchema);
+
 
 //middleware
 app.engine('hbs', hbs.engine({ extname: 'hbs' }));
@@ -35,41 +48,53 @@ app.use(express.json());
 app.use(Passport.initialize());
 app.use(Passport.session());
 
-Passport.serializeUser(function(user, done) {
-    done(null, user.id)
+Passport.serializeUser(function(User, done) {
+    done(null, User.id)
 
 });
 
 Passport.deserializeUser(function(id, done) {
-    user.findById(id, function(err, user) {
-        done(err, user)
+    User.findById(id, function(err, User) {
+        done(err, User)
     })
 
 });
 
-Passport.use(new localStrategy(function(userName, password, done) {
-    User.findOne({ username: username }, function(err, user) {
+Passport.use(new localStrategy(function(username, password, done) {
+    User.findOne({ username: username }, function(err, User) {
         if (err) { return done(err) }
-        if (!user) {
+        if (!User) {
             return done(null, false, { message: 'Incorrect Username' });
 
-            bcrypt.compare(password, user.password, function(err, res) {
-                if (err) { return done(err) };
-                if (res === false) { return done(null, false, { message: "Incorrect Password." }) };
-                return done(null, user)
-            })
+        };
 
-        }
+        bcrypt.compare(password, User.password, function(err, res) {
+            if (err) { return done(err) };
+            if (res === false) { return done(null, false, { message: "Incorrect Password." }) };
+            return done(null, User)
+        });
     })
 
 }));
 
 function isLoggedin(req, res, next) {
-    if (req.isAuthenticated) {
+    if (req.isAuthenticated()) {
         return next()
 
     } else {
         res.redirect('/login')
+
+    }
+
+}
+
+
+function isLoggedout(req, res, next) {
+    if (!req.isAuthenticated()) {
+        return next()
+
+    } else {
+        res.redirect('/')
 
     }
 
@@ -82,14 +107,31 @@ app.get('/', isLoggedin, (req, res) => {
 
 });
 
-app.get('/login', (req, res) => {
-    res.render("Login", { title: "Login" })
-})
+app.get('/login', isLoggedout, (req, res) => {
+    const response = {
+        title: "Login",
+        error: req.query.error
+    }
 
-app.get('/setup', async(req, res) => {
-    const exists = await user.exists({ username: "admin" });
+    res.render("Login", response)
+});
+
+app.post('/login', Passport.authenticate('local', {
+    successRedirect: '/login',
+    failRedirect: '/login?error=true'
+}));
+
+app.get('/logout', (req, res) => {
+
+    req.logout();
+    res.redirect('/');
+});
+
+app.get('/setup', async function(req, res, next) {
+    const exists = await User.exists({ username: "admin" });
 
     if (exists) {
+        console.log("exists")
         res.redirect('/login');
         return;
     };
@@ -100,7 +142,7 @@ app.get('/setup', async(req, res) => {
 
         }
 
-        bcrypt.hash("myPassword", salt, function(err, hash) {
+        bcrypt.hash("pass", salt, function(err, hash) {
             if (err) {
                 return next(err);
 
@@ -117,6 +159,8 @@ app.get('/setup', async(req, res) => {
     })
 
 })
+
+
 
 app.listen(4000, () => {
     console.log("listening to port 4000")
